@@ -23,6 +23,7 @@ export function create(input: string, output: Writable, options: { fps?: number;
   ffmpeg(input)
     .inputFPS(options.fps ?? 15)
     .noAudio()
+    .inputOptions(["-readrate", "1"])
 
     .outputFormat("image2pipe")
 
