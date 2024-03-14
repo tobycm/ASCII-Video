@@ -2,47 +2,43 @@ import asciify from "asciify-image";
 import ffmpeg from "fluent-ffmpeg";
 import { Writable } from "stream";
 
-export function create(input: string, options: { fps?: number; width?: number }) {
-  return new Promise<(string | string[])[]>((resolve, reject) => {
-    const frames: any[] = [];
+export function create(input: string, output: Writable, options: { fps?: number; width?: number }) {
+  const locks: number[] = [];
 
-    const locks: number[] = [];
+  const frames = new Writable({
+    write(chunk, encoding, callback) {
+      locks.push(locks.length++);
 
-    const output = new Writable({
-      write(chunk, encoding, callback) {
-        locks.push(locks.length++);
+      console.log("Processing frame", locks.length);
 
-        console.log("Processing frame", locks.length);
+      asciify(chunk, { width: options.width ?? 160 }, (err, asciified) => {
+        if (!err) output.write(asciified, callback);
 
-        asciify(chunk, { width: options.width ?? 160 }, (err, asciified) => {
-          frames.push(asciified);
+        locks.pop();
+      });
 
-          locks.pop();
-        });
+      callback();
+    },
 
-        callback();
-      },
+    final(callback) {
+      if (locks.length) return setImmediate(() => this._final(callback));
 
-      final(callback) {
-        if (locks.length) return setImmediate(() => this._final(callback));
+      output.end();
 
-        resolve(frames);
-
-        callback();
-      },
-    });
-
-    ffmpeg(input)
-      .inputFPS(options.fps ?? 15)
-      .noAudio()
-
-      .outputFormat("image2pipe")
-
-      .on("end", output.end)
-      .on("error", console.error)
-
-      .pipe(output);
+      callback();
+    },
   });
+
+  ffmpeg(input)
+    .inputFPS(options.fps ?? 15)
+    .noAudio()
+
+    .outputFormat("image2pipe")
+
+    .on("end", frames.end)
+    .on("error", console.error)
+
+    .pipe(frames);
 }
 
 export default {
