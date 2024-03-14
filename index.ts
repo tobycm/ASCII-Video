@@ -3,26 +3,17 @@ import ffmpeg from "fluent-ffmpeg";
 import { Writable } from "stream";
 
 export function create(input: string, output: Writable, options: { fps?: number; width?: number }) {
-  const locks: number[] = [];
-
   const frames = new Writable({
-    write(chunk, encoding, callback) {
-      locks.push(locks.length++);
-
-      console.log("Processing frame", locks.length);
-
-      asciify(chunk, { width: options.width ?? 160 }, (err, asciified) => {
-        if (!err) output.write(asciified, callback);
-
-        locks.pop();
-      });
-
-      callback();
+    async write(chunk, encoding, callback) {
+      try {
+        const ascii = await asciify(chunk, { fit: "box", width: options.width ?? 50 });
+        output.write(ascii, callback);
+      } catch {
+        callback();
+      }
     },
 
     final(callback) {
-      if (locks.length) return setImmediate(() => this._final(callback));
-
       output.end();
 
       callback();
