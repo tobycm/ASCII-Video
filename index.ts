@@ -6,7 +6,7 @@ const TEMP_DIR = "/tmp/videoToAscii/";
 
 export async function create(input: Buffer, id: string, tempDir: string = TEMP_DIR, fps: number = 15) {
   // create temp directory if it doesn't exist
-  if (!fs.existsSync(`${tempDir}/${id}/`)) fs.mkdirSync(`${tempDir}/${id}/`);
+  if (!fs.existsSync(`${tempDir}/${id}/`)) fs.mkdirSync(`${tempDir}/${id}/`, { recursive: true });
 
   const ffmpegCall = $`ffmpeg -i pipe:0 -vf fps=1/${fps} %d.png`;
 
@@ -24,3 +24,7 @@ export async function create(input: Buffer, id: string, tempDir: string = TEMP_D
 
   return frames;
 }
+
+export default {
+  create,
+};
