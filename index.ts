@@ -1,28 +1,48 @@
-import asciifyImage from "asciify-image";
-import { $ } from "bun";
-import fs from "fs";
+import asciify from "asciify-image";
+import ffmpeg from "fluent-ffmpeg";
+import { Writable } from "stream";
 
-const TEMP_DIR = "/tmp/videoToAscii/";
+export function create(input: string, options: { fps?: number; width?: number }) {
+  return new Promise<(string | string[])[]>((resolve, reject) => {
+    const frames: any[] = [];
 
-export async function create(input: Buffer, id: string, tempDir: string = TEMP_DIR, fps: number = 15) {
-  // create temp directory if it doesn't exist
-  if (!fs.existsSync(`${tempDir}/${id}/`)) fs.mkdirSync(`${tempDir}/${id}/`, { recursive: true });
+    const locks: number[] = [];
 
-  const ffmpegCall = $`ffmpeg -i pipe:0 -vf fps=1/${fps} %d.png`;
+    const output = new Writable({
+      write(chunk, encoding, callback) {
+        locks.push(locks.length++);
 
-  ffmpegCall.stdin.getWriter().write(input);
+        console.log("Processing frame", locks.length);
 
-  const ffmpegResult = await ffmpegCall;
+        asciify(chunk, { width: options.width ?? 160 }, (err, asciified) => {
+          frames.push(asciified);
 
-  if (ffmpegResult.exitCode !== 0) return ffmpegResult.stderr;
+          locks.pop();
+        });
 
-  const files = fs.readdirSync(`${tempDir}/${id}/`).map((file) => `${tempDir}/${id}/${file}`);
+        callback();
+      },
 
-  const frames = [];
+      final(callback) {
+        if (locks.length) return setImmediate(() => this._final(callback));
 
-  for (const file of files) frames.push(await asciifyImage(file));
+        resolve(frames);
 
-  return frames;
+        callback();
+      },
+    });
+
+    ffmpeg(input)
+      .inputFPS(options.fps ?? 15)
+      .noAudio()
+
+      .outputFormat("image2pipe")
+
+      .on("end", output.end)
+      .on("error", console.error)
+
+      .pipe(output);
+  });
 }
 
 export default {
