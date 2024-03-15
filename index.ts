@@ -27,7 +27,7 @@ export function create(input: string, output: Writable, options: { fps?: number;
     .inputOptions("-readrate", "1")
 
     .outputFormat("image2pipe")
-    .videoCodec("png")
+    // .videoCodec("png")
     .outputFps(options.fps ?? 15)
 
     .on("end", frames.end)
